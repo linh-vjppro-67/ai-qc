@@ -204,7 +204,7 @@ const DETECTION_BY_FILENAME: Record<string, DetectionPreset> = {
     bestSuggestionName: "Hole",
     overlay: {
       label: "Hole • 86%",
-      bbox: { leftPct: 45.43, topPct: 48.57, wPx: 100, hPx: 70 }, 
+      bbox: { leftPct: 45.43, topPct: 48.57, wPx: 100, hPx: 70 },
       heat: { leftPct: 42.43, topPct: 45.57, wPx: 140, hPx: 110 },
     },
   },
@@ -250,15 +250,10 @@ const DETECTION_BY_FILENAME: Record<string, DetectionPreset> = {
     bestSuggestionName: "Broken Stitch",
     overlay: {
       label: "Broken Stitch • 74%",
-      bbox: { leftPct: 43.14, topPct: 46.71, wPx: 155, hPx: 70 }, // 140 × 80 = 11,200
+      bbox: { leftPct: 43.14, topPct: 46.71, wPx: 155, hPx: 70 },
       heat: { leftPct: 40.14, topPct: 43.71, wPx: 180, hPx: 140 },
     },
   },
-
-  // Optional: nếu bạn có demo.jpg thay vì demo.jpeg thì add thêm:
-  // "demo.jpg": DEFAULT_PRESET,
-  // "demo1.jpg": ...,
-  // "demo2.jpg": ...,
 };
 
 /** ========= Small Toast (no dependency) ========= */
@@ -354,14 +349,12 @@ export function InspectionPanel() {
   const sku = "SKU-A1234";
   const lot = "Lot #78921";
 
-  // image state
-  const [imageUrl, setImageUrl] = useState<string>(
-    "https://images.unsplash.com/photo-1558171813-4c088753af8f?w=800&h=600&fit=crop"
-  );
+  // image state (START EMPTY)
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageFileName, setImageFileName] = useState<string | undefined>(undefined);
 
-  // UI controls
-  const [showOverlay, setShowOverlay] = useState(true);
+  // UI controls (overlay OFF by default)
+  const [showOverlay, setShowOverlay] = useState(false);
   const [zoom, setZoom] = useState(100);
   const [rotation, setRotation] = useState(0);
 
@@ -403,7 +396,7 @@ export function InspectionPanel() {
   // Cleanup blob URL
   useEffect(() => {
     return () => {
-      if (imageUrl.startsWith("blob:")) URL.revokeObjectURL(imageUrl);
+      if (imageUrl && imageUrl.startsWith("blob:")) URL.revokeObjectURL(imageUrl);
     };
   }, [imageUrl]);
 
@@ -452,11 +445,14 @@ export function InspectionPanel() {
     }
 
     // cleanup previous blob
-    if (imageUrl.startsWith("blob:")) URL.revokeObjectURL(imageUrl);
+    if (imageUrl && imageUrl.startsWith("blob:")) URL.revokeObjectURL(imageUrl);
 
     const url = URL.createObjectURL(file);
     setImageUrl(url);
     setImageFileName(file.name);
+
+    // SHOW OVERLAY ONLY AFTER UPLOAD
+    setShowOverlay(true);
 
     // preset logic: only 3 demo files have different detections; others use default
     const preset = DETECTION_BY_FILENAME[file.name] ?? DEFAULT_PRESET;
@@ -469,8 +465,9 @@ export function InspectionPanel() {
 
   // viewer interactions
   const onViewerClick = (e: React.MouseEvent) => {
-    // Move bbox for demo realism (you can remove if you don't want)
+    if (!imageUrl) return; // no image => no move bbox
     if (!viewerRef.current) return;
+
     const rect = viewerRef.current.getBoundingClientRect();
     const px = (e.clientX - rect.left) / rect.width;
     const py = (e.clientY - rect.top) / rect.height;
@@ -654,10 +651,15 @@ export function InspectionPanel() {
 
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setShowOverlay(!showOverlay)}
+                onClick={() => imageUrl && setShowOverlay(!showOverlay)}
+                disabled={!imageUrl}
                 className={cn(
                   "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
-                  showOverlay ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground hover:text-foreground"
+                  !imageUrl
+                    ? "bg-secondary text-muted-foreground opacity-50 cursor-not-allowed"
+                    : showOverlay
+                    ? "bg-primary/20 text-primary"
+                    : "bg-secondary text-muted-foreground hover:text-foreground"
                 )}
               >
                 <Layers className="w-4 h-4" />
@@ -707,21 +709,37 @@ export function InspectionPanel() {
             ref={viewerRef}
             onClick={onViewerClick}
             className="relative aspect-video bg-background/50 flex items-center justify-center overflow-hidden cursor-crosshair"
-            title="Click to move bbox (demo)"
+            title={imageUrl ? "Click to move bbox (demo)" : "Upload an image to start"}
           >
-            <img
-              src={imageUrl}
-              alt="Garment inspection"
-              className="max-w-full max-h-full object-contain select-none"
-              draggable={false}
-              style={{
-                transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
-                transformOrigin: "center",
-              }}
-            />
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt="Garment inspection"
+                className="max-w-full max-h-full object-contain select-none"
+                draggable={false}
+                style={{
+                  transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
+                  transformOrigin: "center",
+                }}
+              />
+            ) : (
+              <div className="text-center px-6">
+                <div className="text-lg font-semibold text-foreground">No image uploaded</div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  Click <span className="font-medium">Upload Image</span> to start inspection.
+                </div>
+                <button
+                  onClick={triggerUpload}
+                  className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload Image
+                </button>
+              </div>
+            )}
 
-            {/* Overlay */}
-            {showOverlay && (
+            {/* Overlay (ONLY after upload) */}
+            {imageUrl && showOverlay && (
               <>
                 {/* Bounding box */}
                 <div
@@ -881,7 +899,9 @@ export function InspectionPanel() {
                     </div>
                     <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{s.description}</p>
                   </div>
-                  <span className={cn("px-2 py-1 rounded-full text-xs font-bold font-mono", getConfidenceColor(s.confidence))}>
+                  <span
+                    className={cn("px-2 py-1 rounded-full text-xs font-bold font-mono", getConfidenceColor(s.confidence))}
+                  >
                     {s.confidence}%
                   </span>
                 </div>
@@ -983,7 +1003,7 @@ export function InspectionPanel() {
                   </div>
                   <div className="space-y-1 pb-3">
                     {g.items.map((it) => {
-                      const active = selectedOther?.name === it.name && selectedOther?.group === g.group;
+                      const active = selectedOther?.name === it.name && selectedOther?.group === it.name;
                       return (
                         <button
                           key={it.name}

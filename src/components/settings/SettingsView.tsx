@@ -114,7 +114,6 @@ const settingsSections: Array<{
   icon: any;
   description: string;
 }> = [
-  { id: "model", label: "AI Model", icon: Cpu, description: "Configure model version and runtime behavior" },
   { id: "notifications", label: "Notifications", icon: Bell, description: "Alert preferences, thresholds, and channels" },
   { id: "security", label: "Security", icon: Shield, description: "SSO/MFA, session control, API keys, allowlist" },
   { id: "data", label: "Data Management", icon: Database, description: "Storage, retention, export, encryption policies" },
